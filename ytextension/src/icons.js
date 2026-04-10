@@ -11,6 +11,7 @@ export const Icons = {
     openas: "src/assets/icons/openas.png",
     boost: "src/assets/icons/boost.png",
     download: "src/assets/icons/download.png",
+    drag: "src/assets/icons/drag.png",
     // add more here
 };
 
@@ -23,5 +24,6 @@ export function createIcon(path, width = 32, height = 32) {
     img.style.pointerEvents = "none"; // so clicking button triggers button, not image
     img.style.background = "transparent";
     img.style.display = "block";
+    img.style.filter = "brightness(0) invert(1)";
     return img;
 }
