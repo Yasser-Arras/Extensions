@@ -1,0 +1,17 @@
+{
+  "open": [
+ 
+    "shared/open/metal-pipe.ogg",
+
+    "shared/open/vine.ogg"
+
+  ],
+  "close": [
+    "shared/close/glass1.ogg",
+    "shared/close/glass2.ogg",
+    "shared/close/glass3.ogg",
+    "shared/close/glass4.ogg",
+    "shared/close/glass5.ogg",
+    "shared/close/glass6.ogg"
+  ]
+}
