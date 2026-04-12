@@ -1,16 +1,26 @@
 const esbuild = require("esbuild");
 
-async function startWatch() {
-  const ctx = await esbuild.context({
-    entryPoints: ["src/main.js"],
-    bundle: true,
-    outfile: "dist/content.js",
-    minify: false,
-    sourcemap: true
-  });
+const buildOptions = {
+  entryPoints: ["src/main.js"],
+  bundle: true,
+  outfile: "dist/content.js",
+  minify: false,
+  sourcemap: true
+};
 
-  await ctx.watch();
-  console.log("waiting for changes...");
+async function run() {
+  const watch = process.argv.includes("--watch");
+  if (watch) {
+    const ctx = await esbuild.context(buildOptions);
+    await ctx.watch();
+    console.log("waiting for changes...");
+    return;
+  }
+  await esbuild.build(buildOptions);
+  console.log("built dist/content.js");
 }
 
-startWatch();
+run().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

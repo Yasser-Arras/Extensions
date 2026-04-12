@@ -37,10 +37,5 @@ export const State = {
         tweaks[key] = value;
         this.data.tweaks = tweaks;
         save("yt_short_state", this.data);
-    },
-
-    isUserReady() {
-        // Assume user is ready since we're on YouTube Shorts
-        return true;
     }
 };
