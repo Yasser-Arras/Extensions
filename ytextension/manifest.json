@@ -3,19 +3,25 @@
   "name": "YT Shorts Toolbox",
   "version": "1.0",
   "description": "Custom toolbar for YouTube Shorts with play/pause, speed, and more.",
-  
+
   "permissions": ["storage"],
+
+  "host_permissions": [
+    "*://*.youtube.com/*"
+  ],
+
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/shorts/*", "*://*.youtube.com/watch*"],
+      "matches": ["*://*.youtube.com/*"],
       "js": ["dist/content.js"],
       "run_at": "document_idle"
     }
   ],
+
   "web_accessible_resources": [
-  {
-    "resources": ["src/assets/icons/*"],
-    "matches": ["*://*.youtube.com/*"]
-  }
-]
+    {
+      "resources": ["src/assets/icons/*"],
+      "matches": ["*://*.youtube.com/*"]
+    }
+  ]
 }

@@ -1,41 +1,29 @@
-// src/state.js
-import { save, load } from "./utils.js";
-
-const DEFAULT_STATE = {
-    play: true,
-    speed: 1,
-    volumeLevel: 0,
-    tweaks: {
-        autoPlayNext: true,
-        moveShortsAds: false,
-        hideShortsMetadata: false,
-        hideEndCards: false
-    }
-};
+// state.js
 
 export const State = {
-    data: load("yt_short_state", DEFAULT_STATE),
+  data: {
+    mode: "none",
+    video: null,
+    active: false,
+    guiBuilt: false,
+    lastUrl: location.href,
 
-    set(key, value) {
-        this.data[key] = value;
-        save("yt_short_state", this.data);
-    },
+    speed: 1,
+    volumeBoost: 0
+  },
 
-    get(key) {
-        return this.data[key];
-    },
+  set(key, value) {
+    this.data[key] = value;
+  },
 
-    getTweaks() {
-        if (!this.data.tweaks) {
-            this.data.tweaks = { ...DEFAULT_STATE.tweaks };
-        }
-        return { ...DEFAULT_STATE.tweaks, ...this.data.tweaks };
-    },
+  get(key) {
+    return this.data[key];
+  },
 
-    setTweak(key, value) {
-        const tweaks = this.getTweaks();
-        tweaks[key] = value;
-        this.data.tweaks = tweaks;
-        save("yt_short_state", this.data);
-    }
+  resetMode(mode) {
+    this.data.mode = mode;
+    this.data.video = null;
+    this.data.active = false;
+    this.data.guiBuilt = false;
+  }
 };

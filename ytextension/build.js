@@ -1,26 +1,42 @@
 const esbuild = require("esbuild");
 
-const buildOptions = {
-  entryPoints: ["src/main.js"],
+const opts = {
+  entryPoints: ["src/main.js"],   // your real entry (build.js or main.js)
   bundle: true,
   outfile: "dist/content.js",
   minify: false,
-  sourcemap: true
+  sourcemap: true,
+  target: ["es2020"],
+  format: "iife", // IMPORTANT for browser extensions content scripts
+  logLevel: "info"
 };
 
-async function run() {
-  const watch = process.argv.includes("--watch");
-  if (watch) {
-    const ctx = await esbuild.context(buildOptions);
-    await ctx.watch();
-    console.log("waiting for changes...");
-    return;
-  }
-  await esbuild.build(buildOptions);
-  console.log("built dist/content.js");
+async function buildOnce() {
+  await esbuild.build(opts);
+  console.log("[BUILD] done -> dist/content.js");
 }
 
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+async function watchBuild() {
+  const ctx = await esbuild.context(opts);
+
+  await ctx.watch();
+
+  console.log("[BUILD] watching...");
+
+
+}
+
+async function main() {
+  try {
+    if (process.argv.includes("--watch")) {
+      await watchBuild();
+    } else {
+      await buildOnce();
+    }
+  } catch (err) {
+    console.error("[BUILD ERROR]", err);
+    process.exit(1);
+  }
+}
+
+main();
