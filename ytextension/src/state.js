@@ -24,6 +24,6 @@ export const State = {
     this.data.mode = mode;
     this.data.video = null;
     this.data.active = false;
-    this.data.guiBuilt = false;
+  
   }
 };

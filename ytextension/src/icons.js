@@ -1,3 +1,4 @@
+// icons.js
 export const Icons = {
   play: "src/assets/icons/play.png",
   pause: "src/assets/icons/pause.png",

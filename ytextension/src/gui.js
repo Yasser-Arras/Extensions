@@ -1,42 +1,98 @@
-import { Icons, createIcon } from "./icons.js";
+// gui.js
 import { State } from "./state.js";
+import { Icons, createIcon } from "./icons.js";
 
 let root = null;
 let toolbar = null;
-let built = false;
 
 // --------------------
-// BUILD GUI
+// BUILD GUI (SAFE)
 // --------------------
 export function buildGUI() {
-  if (built) return;
-  if (State.get("mode") === "none") return;
+  if (State.get("guiBuilt"))   console.log("[GUI] already built "); return;
 
-  built = true;
+
+  State.set("guiBuilt", true);
 
   console.log("[GUI] build");
 
+  createRoot();
+  createToolbar();
+  syncToolbar();
+}
+
+// --------------------
+// ROOT FLOATING BUTTON
+// --------------------
+function createRoot() {
   root = document.createElement("div");
-  root.style.position = "fixed";
-  root.style.top = "50px";
-  root.style.left = "50px";
-  root.style.zIndex = "999999";
+
+  Object.assign(root.style, {
+    position: "fixed",
+    top: "80px",
+    left: "80px",
+    zIndex: 999999,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "6px",
+    userSelect: "none"
+  });
+
+  const handle = document.createElement("div");
+  handle.style.width = "28px";
+  handle.style.height = "28px";
+  handle.style.cursor = "grab";
+  handle.style.display = "flex";
+  handle.style.alignItems = "center";
+  handle.style.justifyContent = "center";
+
+  handle.appendChild(createIcon(Icons.drag, 28, 28));
 
   const btn = document.createElement("button");
-  btn.style.width = "40px";
-  btn.style.height = "40px";
-  btn.style.background = "#191919";
-  btn.style.border = "1px solid #555";
-  btn.style.borderRadius = "10px";
+
+  Object.assign(btn.style, {
+    width: "40px",
+    height: "40px",
+    background: "#191919",
+    border: "1px solid #555",
+    borderRadius: "10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  });
 
   btn.appendChild(createIcon(Icons.cog, 20, 20));
 
   btn.onclick = () => {
-    if (!toolbar) ensureToolbar();
+    if (!toolbar) createToolbar();
     toolbar.style.display =
-      toolbar.style.display === "none" ? "flex" : "none";
+      toolbar.style.display === "flex" ? "none" : "flex";
   };
 
+  // drag
+  let ox = 0, oy = 0;
+
+  handle.onmousedown = (e) => {
+    ox = e.clientX - root.offsetLeft;
+    oy = e.clientY - root.offsetTop;
+
+    const move = (ev) => {
+      root.style.left = ev.clientX - ox + "px";
+      root.style.top = ev.clientY - oy + "px";
+      syncToolbar();
+    };
+
+    const up = () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+    };
+
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+  };
+
+  root.appendChild(handle);
   root.appendChild(btn);
   document.body.appendChild(root);
 }
@@ -44,32 +100,54 @@ export function buildGUI() {
 // --------------------
 // TOOLBAR
 // --------------------
-function ensureToolbar() {
+function createToolbar() {
   toolbar = document.createElement("div");
-  toolbar.style.position = "fixed";
-  toolbar.style.top = "120px";
-  toolbar.style.left = "50px";
-  toolbar.style.display = "flex";
-  toolbar.style.gap = "6px";
-  toolbar.style.background = "#2b2b2b";
-  toolbar.style.padding = "8px";
-  toolbar.style.borderRadius = "10px";
-  toolbar.style.zIndex = "999999";
+
+  Object.assign(toolbar.style, {
+    position: "fixed",
+    display: "none",
+    gap: "6px",
+    padding: "8px",
+    background: "#2b2b2b",
+    borderRadius: "12px",
+    zIndex: 999999
+  });
 
   document.body.appendChild(toolbar);
 }
 
 // --------------------
-// DESTROY
+// SYNC POSITION
 // --------------------
-export function destroyGUI() {
-  console.log("[GUI] destroy");
+function syncToolbar() {
+  if (!root || !toolbar) return;
 
-  built = false;
+  const r = root.getBoundingClientRect();
 
-  if (root) root.remove();
-  if (toolbar) toolbar.remove();
+  toolbar.style.top = r.top + 70 + "px";
+  toolbar.style.left = r.left + "px";
+}
 
-  root = null;
-  toolbar = null;
+// --------------------
+// ADD BUTTON (EXTERNAL API)
+// --------------------
+export function addButton(btn) {
+  if (!toolbar) createToolbar();
+  toolbar.appendChild(btn);
+}
+
+// --------------------
+// UPDATE GUI (CALLED FROM OUTSIDE)
+// --------------------
+export function updateGUI() {
+  if (!State.get("guiBuilt")) return;
+
+  const mode = State.get("mode");
+
+  if (mode === "none") {
+    destroyGUI();
+    return;
+  }
+
+  syncToolbar();
 }

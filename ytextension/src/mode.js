@@ -3,13 +3,13 @@
 import { State } from "./state.js";
 import { Controller } from "./controller.js";
 
-let currentMode = "none";
-let lastUrl = location.href;
+let mode = "none";
+let url = location.href;
 
 // ------------------------
-// MODE DETECTION
+// DETECT MODE
 // ------------------------
-function getMode() {
+function detectMode() {
   const p = location.pathname;
 
   if (p.startsWith("/shorts/")) return "shorts";
@@ -19,79 +19,82 @@ function getMode() {
 }
 
 // ------------------------
-// BLOCKING WAIT FUNCTION (SYNC STYLE)
+// BLOCKING WAIT
 // ------------------------
-function waitFor(checkFn, interval = 1000, timeout = 10000) {
-  let elapsed = 0;
+function waitUntil(check, onDone) {
+  let tries = 0;
 
-  while (elapsed < timeout) {
-
-     if (!State.get("active")) return null;
-
-    const result = checkFn();
-    if (result) return result;
-
-    const start = Date.now();
-    while (Date.now() - start < interval) {
-      if (!active) return null;
+  const interval = setInterval(() => {
+    if (!State.get("active")) {
+      clearInterval(interval);
+      console.log("[WAIT] cancelled");
+      return;
     }
 
-    elapsed += interval;
-  }
+    const result = check();
 
-  return null;
+    if (result) {
+      clearInterval(interval);
+      console.log("[WAIT] success");
+      onDone(result);
+      return;
+    }
+
+    tries++;
+    if (tries > 10) {
+      clearInterval(interval);
+      console.log("[WAIT] timeout");
+    }
+
+  }, 1000);
 }
-
 // ------------------------
-// START SYSTEM
+// START
 // ------------------------
 export function startModeSystem() {
-  currentMode = getMode();
-  lastUrl = location.href;
+  mode = detectMode();
+  url = location.href;
 
-  console.log("[MODE] start:", currentMode);
+  console.log("[MODE] start:", mode);
 
-  observe();
-  route();
+  watchUrl();
+  handleRoute();
 }
 
 // ------------------------
-// URL OBSERVER
+// WATCH URL (SPA)
 // ------------------------
-function observe() {
-  const obs = new MutationObserver(() => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
-      route();
+function watchUrl() {
+  new MutationObserver(() => {
+    if (location.href !== url) {
+      url = location.href;
+      handleRoute();
     }
-  });
-
-  obs.observe(document, { subtree: true, childList: true });
+  }).observe(document, { subtree: true, childList: true });
 }
 
 // ------------------------
-// ROUTE HANDLER
+// ROUTE LOGIC
 // ------------------------
-function route() {
-  const newMode = getMode();
+function handleRoute() {
+  const newMode = detectMode();
 
-  if (newMode === currentMode) {
-    refresh();
-    return;
+  if (newMode === mode) {
+    refreshVideo();
+  } else {
+    enterMode(newMode);
   }
-
-  switchMode(newMode);
 }
 
 // ------------------------
-// SWITCH MODE
+// ENTER MODE
 // ------------------------
-function switchMode(newMode) {
-  console.log("[MODE] switch:", currentMode, "->", newMode);
+function enterMode(newMode) {
+  console.log("[MODE] switch:", mode, "->", newMode);
 
-  cleanup();
+  stop(); // cleanup old
 
-  currentMode = newMode;
+  mode = newMode;
 
   State.resetMode(newMode);
   State.set("mode", newMode);
@@ -100,46 +103,38 @@ function switchMode(newMode) {
 
   State.set("active", true);
 
-  const video = waitFor(() => document.querySelector("video"));
-
-  if (!video) return;
-
-  State.set("video", video);
-
-  Controller.bind(video);
-
-  waitFor(() => video.readyState >= 2);
-
-  Controller.applyAll();
+  attachVideo();
 }
+
 // ------------------------
-// SAME MODE REFRESH
+// REFRESH (same mode)
 // ------------------------
-function refresh() {
-  if (currentMode === "none") return;
+function refreshVideo() {
+  if (mode === "none") return;
 
-  const video = waitFor(() => document.querySelector("video"));
+  attachVideo();
+}
 
-  if (!video) return;
-
+// ------------------------
+// VIDEO FLOW
+// ------------------------
+function attachVideo() {
+  waitUntil(() => document.querySelector("video"), (video) => {
   State.set("video", video);
-  State.set("active", true);
-
   Controller.bind(video);
 
-  waitFor(() => video.readyState >= 2);
-
-  Controller.applyAll();
+  waitUntil(() => video.readyState >= 2, () => {
+    Controller.applyAll();
+  });
+});
 }
 
 // ------------------------
 // CLEANUP
 // ------------------------
-function cleanup() {
+function stop() {
   console.log("[MODE] cleanup");
 
   State.set("active", false);
   State.set("video", null);
-
-  currentMode = "none";
 }
