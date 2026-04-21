@@ -2,12 +2,15 @@
 
 import { State } from "./state.js";
 import { Controller } from "./controller.js";
-
+import { showGUI, hideGUI } from "./gui.js";
 let mode = "none";
 let url = location.href;
 
+let waits = [];
+let attaching = false;
+
 // ------------------------
-// DETECT MODE
+// MODE DETECTION
 // ------------------------
 function detectMode() {
   const p = location.pathname;
@@ -19,35 +22,34 @@ function detectMode() {
 }
 
 // ------------------------
-// BLOCKING WAIT
+// WAIT (NON-BLOCKING)
 // ------------------------
-function waitUntil(check, onDone) {
+function waitUntil(check, done) {
   let tries = 0;
 
-  const interval = setInterval(() => {
+  const id = setInterval(() => {
     if (!State.get("active")) {
-      clearInterval(interval);
-      console.log("[WAIT] cancelled");
+      clearInterval(id);
       return;
     }
 
-    const result = check();
+    const res = check();
 
-    if (result) {
-      clearInterval(interval);
-      console.log("[WAIT] success");
-      onDone(result);
+    if (res) {
+      clearInterval(id);
+      done(res);
       return;
     }
 
-    tries++;
-    if (tries > 10) {
-      clearInterval(interval);
-      console.log("[WAIT] timeout");
+    if (++tries > 10) {
+      clearInterval(id);
     }
 
   }, 1000);
+
+  waits.push(id);
 }
+
 // ------------------------
 // START
 // ------------------------
@@ -57,14 +59,14 @@ export function startModeSystem() {
 
   console.log("[MODE] start:", mode);
 
-  watchUrl();
+  observeUrl();
   handleRoute();
 }
 
 // ------------------------
-// WATCH URL (SPA)
+// URL OBSERVER
 // ------------------------
-function watchUrl() {
+function observeUrl() {
   new MutationObserver(() => {
     if (location.href !== url) {
       url = location.href;
@@ -74,67 +76,95 @@ function watchUrl() {
 }
 
 // ------------------------
-// ROUTE LOGIC
+// ROUTE
 // ------------------------
 function handleRoute() {
   const newMode = detectMode();
 
   if (newMode === mode) {
-    refreshVideo();
+    refresh();
   } else {
-    enterMode(newMode);
+    enter(newMode);
   }
 }
 
 // ------------------------
 // ENTER MODE
 // ------------------------
-function enterMode(newMode) {
+function enter(newMode) {
   console.log("[MODE] switch:", mode, "->", newMode);
 
-  stop(); // cleanup old
+  cleanup();
 
   mode = newMode;
 
   State.resetMode(newMode);
   State.set("mode", newMode);
 
-  if (newMode === "none") return;
+  if (newMode === "none") {
+    hideGUI();
+    return;
+  }
 
   State.set("active", true);
 
   attachVideo();
+  showGUI();
 }
 
 // ------------------------
-// REFRESH (same mode)
+// REFRESH SAME MODE
 // ------------------------
-function refreshVideo() {
+function refresh() {
   if (mode === "none") return;
 
+  State.set("active", true);
   attachVideo();
 }
 
 // ------------------------
 // VIDEO FLOW
-// ------------------------
-function attachVideo() {
-  waitUntil(() => document.querySelector("video"), (video) => {
-  State.set("video", video);
-  Controller.bind(video);
+// ------------------------ç
 
-  waitUntil(() => video.readyState >= 2, () => {
-    Controller.applyAll();
-  });
-});
+function getVideo() {
+  const vids = document.querySelectorAll("video");
+
+  for (const v of vids) {
+    if (v.readyState >= 2 && v.offsetParent !== null) {
+      return v; // visible + usable
+    }
+  }
+
+  return vids[0] || null;
 }
+function attachVideo() {
+  if (attaching) return;
+  attaching = true;
 
+  waitUntil(() => getVideo(), (video) => {
+    attaching = false;
+
+    if (!video) return;
+    if (State.get("video") === video) return;
+
+    State.set("video", video);
+    Controller.bind(video);
+
+    waitUntil(() => video.readyState >= 2, () => {
+      Controller.applyAll();
+    });
+  });
+}
 // ------------------------
 // CLEANUP
 // ------------------------
-function stop() {
+function cleanup() {
   console.log("[MODE] cleanup");
 
   State.set("active", false);
   State.set("video", null);
+
+  waits.forEach(clearInterval);
+  waits = [];
+   attaching = false; 
 }
