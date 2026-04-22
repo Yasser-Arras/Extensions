@@ -42,9 +42,8 @@ A small browser extension that adds a draggable toolbox on YouTube for quick acc
 
 ---
 
-## Future
+## Future improvements...
 
 - volume boost  
 - keyboard shortcuts  
 - UI improvements  
-## Structure
