@@ -1,8 +1,7 @@
-// mode.js
-
 import { State } from "./state.js";
 import { Controller } from "./controller.js";
 import { showGUI, hideGUI } from "./gui.js";
+
 let mode = "none";
 let url = location.href;
 
@@ -10,7 +9,7 @@ let waits = [];
 let attaching = false;
 
 // ------------------------
-// MODE DETECTION
+// MODE
 // ------------------------
 function detectMode() {
   const p = location.pathname;
@@ -22,32 +21,24 @@ function detectMode() {
 }
 
 // ------------------------
-// WAIT (NON-BLOCKING)
+// SIMPLE STATE HELPERS
 // ------------------------
-function waitUntil(check, done) {
-  let tries = 0;
+const isActive = () => State.get("active");
 
-  const id = setInterval(() => {
-    if (!State.get("active")) {
-      clearInterval(id);
-      return;
-    }
+// ------------------------
+// WAIT
+// ------------------------
+function waitForVideo(done) {
+  const tick = () => {
+    if (!State.get("active")) return;
 
-    const res = check();
+    const v = getVideo();
+    if (v) return done(v);
 
-    if (res) {
-      clearInterval(id);
-      done(res);
-      return;
-    }
+    requestAnimationFrame(tick);
+  };
 
-    if (++tries > 10) {
-      clearInterval(id);
-    }
-
-  }, 1000);
-
-  waits.push(id);
+  tick();
 }
 
 // ------------------------
@@ -81,15 +72,12 @@ function observeUrl() {
 function handleRoute() {
   const newMode = detectMode();
 
-  if (newMode === mode) {
-    refresh();
-  } else {
-    enter(newMode);
-  }
+  if (newMode === mode) refresh();
+  else enter(newMode);
 }
 
 // ------------------------
-// ENTER MODE
+// ENTER
 // ------------------------
 function enter(newMode) {
   console.log("[MODE] switch:", mode, "->", newMode);
@@ -113,7 +101,7 @@ function enter(newMode) {
 }
 
 // ------------------------
-// REFRESH SAME MODE
+// REFRESH
 // ------------------------
 function refresh() {
   if (mode === "none") return;
@@ -123,38 +111,63 @@ function refresh() {
 }
 
 // ------------------------
-// VIDEO FLOW
-// ------------------------ç
-
+// VIDEO DETECTION
+// ------------------------
 function getVideo() {
   const vids = document.querySelectorAll("video");
 
   for (const v of vids) {
-    if (v.readyState >= 2 && v.offsetParent !== null) {
-      return v; // visible + usable
-    }
+    if (v.readyState >= 2) return v;
   }
 
   return vids[0] || null;
 }
+
+// ------------------------
+// APPLY SPEED (single source of truth)
+// ------------------------
+function applySpeed(video) {
+  const speed = State.get("speed");
+
+  if (!video || !isFinite(speed)) return;
+
+  console.log("[VIDEO] applying speed:", speed);
+
+  video.playbackRate = speed;
+}
+
+// ------------------------
+// ATTACH VIDEO (clean)
+// ------------------------
 function attachVideo() {
   if (attaching) return;
   attaching = true;
 
-  waitUntil(() => getVideo(), (video) => {
+  waitForVideo((video) => {
     attaching = false;
 
     if (!video) return;
-    if (State.get("video") === video) return;
+
+    const prev = State.get("video");
+    const changed = prev !== video;
 
     State.set("video", video);
     Controller.bind(video);
 
-    waitUntil(() => video.readyState >= 2, () => {
-      Controller.applyAll();
-    });
+    if (changed) {
+      console.log("[VIDEO] changed → reapplying speed");
+    }
+
+    // apply immediately (no delay chain)
+    const speed = State.get("speed");
+
+    if (isFinite(speed)) {
+      video.playbackRate = speed;
+      console.log("[VIDEO] speed applied:", speed);
+    }
   });
 }
+
 // ------------------------
 // CLEANUP
 // ------------------------
@@ -166,5 +179,6 @@ function cleanup() {
 
   waits.forEach(clearInterval);
   waits = [];
-   attaching = false; 
+
+  attaching = false;
 }

@@ -1,8 +1,9 @@
+//controller.js
 import { State } from "./state.js";
 function getVideoId(url = location.href) {
-  return url.split("v=")[1]?.split("&")[0] 
-      || url.split("/shorts/")[1]?.split("?")[0] 
-      || null;
+  return url.split("v=")[1]?.split("&")[0]
+    || url.split("/shorts/")[1]?.split("?")[0]
+    || null;
 }
 function video() {
   return State.get("video");
@@ -27,25 +28,56 @@ export const Controller = {
 
   bind(v) {
     State.set("video", v);
+
+    const speed = State.get("speed");
+
+    if (v && isFinite(speed)) {
+      v.playbackRate = speed;
+    }
+
+    v.addEventListener("ratechange", () => {
+      const s = State.get("speed");
+      if (v && isFinite(s)) {
+        v.playbackRate = s;
+      }
+    });
   },
 
   applyAll() {
-    const v = safeVideo();
-    if (!v) return;
+    const v = State.get("video");
+    const speed = State.get("speed");
 
-    v.playbackRate = State.get("speed") || 1;
+    if (!v || !isFinite(speed)) return;
+
+    v.playbackRate = speed;
   },
-
   setSpeed(v, value) {
     if (!isFinite(value)) return;
 
     State.set("speed", value);
     v.playbackRate = value;
   },
+  volumeBoost(v) {
+    if (!v) return;
 
+    if (!v._g) {
+      const ctx = new AudioContext();
+      const src = ctx.createMediaElementSource(v);
+      const gain = ctx.createGain();
+
+      src.connect(gain);
+      gain.connect(ctx.destination);
+
+      v._g = gain;
+    }
+
+    v.classList.toggle("boosted");
+
+    v._g.gain.value = v.classList.contains("boosted") ? 2 : 1;
+  },
   step(v, amount) {
     if (!isFinite(v.currentTime) || !isFinite(amount)) return;
-    v.pause(); 
+    v.pause();
     const next = v.currentTime + amount;
     if (isFinite(next)) v.currentTime = Math.max(0, next);
   },

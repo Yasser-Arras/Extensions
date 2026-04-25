@@ -1,12 +1,27 @@
+//gui.js
 import { State } from "./state.js";
 import { Controller } from "./controller.js";
 import { Icons, createIcon } from "./icons.js";
 
 let root, toolbar;
-let offset = { x: 0, y: 0 };
 
+// --------------------
+// HELPERS
+// --------------------
 function run(fn, ...args) {
   return Controller.run(fn, ...args);
+}
+
+function savePos(x, y) {
+  localStorage.setItem("toolbox_pos", JSON.stringify({ x, y }));
+}
+
+function loadPos() {
+  try {
+    return JSON.parse(localStorage.getItem("toolbox_pos"));
+  } catch {
+    return null;
+  }
 }
 
 // --------------------
@@ -21,7 +36,7 @@ export function buildGUI() {
 }
 
 // --------------------
-// ROOT
+// ROOT (DRAGGABLE)
 // --------------------
 function createRoot() {
   root = document.createElement("div");
@@ -50,7 +65,6 @@ function createRoot() {
   handle.appendChild(createIcon(Icons.drag, 24, 24));
 
   const mainBtn = document.createElement("button");
-
   Object.assign(mainBtn.style, {
     width: "40px",
     height: "40px",
@@ -69,53 +83,75 @@ function createRoot() {
       toolbar.style.display === "flex" ? "none" : "flex";
   };
 
-  // DRAG FIXED
-  handle.onmousedown = (e) => {
+  // --------------------
+  // DRAG (POINTER CLEAN)
+  // --------------------
+  let offset = { x: 0, y: 0 };
+  let dragging = false;
+
+  handle.onpointerdown = (e) => {
+    dragging = true;
+
     offset.x = e.clientX - root.offsetLeft;
     offset.y = e.clientY - root.offsetTop;
 
-    const move = (ev) => {
-      root.style.left = ev.clientX - offset.x + "px";
-      root.style.top = ev.clientY - offset.y + "px";
-    
-    };
+    handle.setPointerCapture(e.pointerId);
+  };
 
-    document.addEventListener("mousemove", move);
-    document.onmouseup = () =>
-      document.removeEventListener("mousemove", move);
+  handle.onpointermove = (e) => {
+    if (!dragging) return;
+
+    root.style.left = e.clientX - offset.x + "px";
+    root.style.top = e.clientY - offset.y + "px";
+  };
+
+  handle.onpointerup = (e) => {
+    dragging = false;
+    handle.releasePointerCapture(e.pointerId);
+
+    savePos(root.offsetLeft, root.offsetTop);
   };
 
   root.appendChild(handle);
   root.appendChild(mainBtn);
   document.body.appendChild(root);
+
+  // restore position
+  const saved = loadPos();
+  if (saved) {
+    root.style.left = saved.x + "px";
+    root.style.top = saved.y + "px";
+  }
 }
 
 // --------------------
-// TOOLBAR
+// TOOLBAR (INSIDE ROOT)
 // --------------------
 function createToolbar() {
   toolbar = document.createElement("div");
 
   Object.assign(toolbar.style, {
-    position: "absolute", 
-    top: "70px",          
+    position: "absolute",
+    top: "70px",
     left: "50%",
     transform: "translateX(-50%)",
-
     display: "none",
     gap: "6px",
     padding: "8px",
     background: "#2b2b2b",
     borderRadius: "12px",
-
     alignItems: "center",
     justifyContent: "center"
   });
 
-  root.appendChild(toolbar); // 🔥 attach to root
+  root.appendChild(toolbar);
 
   addButtons();
 }
+
+// --------------------
+// SHOW / HIDE
+// --------------------
 export function showGUI() {
   if (root) root.style.display = "flex";
 }
@@ -130,6 +166,7 @@ export function hideGUI() {
 // --------------------
 function button({ icon, title, action, args, altArgs }) {
   const b = document.createElement("button");
+
   if (title) b.title = title;
 
   Object.assign(b.style, {
@@ -155,7 +192,7 @@ function button({ icon, title, action, args, altArgs }) {
 
   // RIGHT CLICK (secondary action)
   b.oncontextmenu = (e) => {
-    e.preventDefault(); // stop browser menu
+    e.preventDefault();
 
     if (altArgs) run(action, ...altArgs);
     else run(action);
@@ -165,10 +202,16 @@ function button({ icon, title, action, args, altArgs }) {
 }
 
 // --------------------
-// CYCLE BUTTON FIXED
+// CYCLE (GENERIC)
 // --------------------
-function cycle(icon, values, initial) {
-  let i = initial || 0;
+function cycle({
+  icon,
+  values = [],
+  initial = 0,
+  labelFormat = (v) => v,
+  action
+}) {
+  let i = initial;
 
   const b = document.createElement("button");
 
@@ -184,11 +227,9 @@ function cycle(icon, values, initial) {
     position: "relative"
   });
 
-  // ICON (same as others)
   const img = createIcon(icon, 22, 22);
   b.appendChild(img);
 
-  // LABEL STICKER (NO LAYOUT IMPACT)
   const label = document.createElement("div");
 
   Object.assign(label.style, {
@@ -202,16 +243,20 @@ function cycle(icon, values, initial) {
     whiteSpace: "nowrap"
   });
 
-  function update() {
-    label.textContent = values[i] + "x";
-    run("setSpeed", values[i]);
+  function apply() {
+    const value = values[i];
+
+    label.textContent = labelFormat(value);
+
+    if (action) run(action, value);
   }
 
-  update();
+  // initial display
+  label.textContent = labelFormat(values[i]);
 
   b.onclick = () => {
     i = (i + 1) % values.length;
-    update();
+    apply();
   };
 
   b.addEventListener("wheel", (e) => {
@@ -222,15 +267,69 @@ function cycle(icon, values, initial) {
         ? (i + 1) % values.length
         : (i - 1 + values.length) % values.length;
 
-    update();
+    apply();
   });
 
   b.appendChild(label);
 
   return b;
 }
+function toggle({
+  icon,
+  title,
+  action,
+  initial = false,
+}) {
+  let on = initial;
+
+  const b = document.createElement("button");
+
+  Object.assign(b.style, {
+    width: "40px",
+    height: "40px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "#2e2e2e",
+    border: "1px solid #555",
+    borderRadius: "6px",
+    position: "relative"
+  });
+
+  const img = createIcon(icon, 22, 22);
+  b.appendChild(img);
+
+ 
+  const bar = document.createElement("div");
+
+  Object.assign(bar.style, {
+    position: "absolute",
+    bottom: "3px",
+    left: "6px",
+    right: "6px",
+    height: "3px",
+    borderRadius: "999px",
+    background: "#ffffff",
+    opacity: on ? "1" : "0",
+    transition: "0.15s"
+  });
+
+  b.appendChild(bar);
+
+  b.title = title;
+
+  b.onclick = () => {
+    on = !on;
+
+    bar.style.opacity = on ? "1" : "0";
+
+    run(action, on);
+  };
+
+  return b;
+}
 // --------------------
-// BUTTONS ORDER
+// BUTTONS
 // --------------------
 function addButtons() {
   toolbar.appendChild(button({
@@ -247,12 +346,22 @@ function addButtons() {
     args: [0.025]
   }));
 
-  toolbar.appendChild(cycle(Icons.speed, [0.5, 1, 1.5, 2, 3], 1));
-
+  toolbar.appendChild(cycle({
+    icon: Icons.speed,
+    values: [0.5, 1, 1.2, 1.5, 2, 3],
+    initial: 1,
+    labelFormat: (v) => v + "x",
+    action: "setSpeed"
+  }));
+toolbar.appendChild(toggle({
+  icon: Icons.boost,
+  title: "Volume Boost",
+  action: "volumeBoost"
+}));
   toolbar.appendChild(button({
     icon: Icons.openas,
     title: "Open as watch video",
-    action: "openAsWatch",
+    action: "openAsWatch"
   }));
 
   toolbar.appendChild(button({
@@ -261,11 +370,11 @@ function addButtons() {
     action: "screenshot"
   }));
 
- toolbar.appendChild(button({
-  icon: Icons.download,
-  title: "Download MP4 / MP3 (right-click)",
-  action: "download",
-  args: ["mp4"],      
-  altArgs: ["mp3"]    
-}));
+  toolbar.appendChild(button({
+    icon: Icons.download,
+    title: "Download MP4 / MP3 (right-click)",
+    action: "download",
+    args: ["mp4"],
+    altArgs: ["mp3"]
+  }));
 }
