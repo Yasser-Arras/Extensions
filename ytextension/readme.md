@@ -16,7 +16,8 @@ A small browser extension that adds a draggable toolbox on YouTube for quick acc
 ## Current Features
 
 - Frame-by-frame stepping (forward / backward)  
-- Playback speed control (cycle + scroll)  
+- Playback speed control (cycle + scroll)
+- Volume Boost
 - Screenshot current frame  
 - Open Shorts as normal video page  
 - Download video  
@@ -44,6 +45,5 @@ A small browser extension that adds a draggable toolbox on YouTube for quick acc
 
 ## Future improvements...
 
-- volume boost  
 - keyboard shortcuts  
-- UI improvements  
+- some UI improvements  ..
